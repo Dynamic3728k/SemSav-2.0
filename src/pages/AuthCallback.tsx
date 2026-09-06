@@ -54,8 +54,8 @@ export default function AuthCallback() {
           return;
         }
 
-        // 3. Wait for DB trigger to create the user row (new Google users)
-        // The Supabase trigger fires async — retry with backoff instead of a single fixed delay.
+        // 3. Wait briefly for any DB trigger to create the user row, but treat a
+        //    missing profile as a BRAND-NEW registration → onboarding (never sign out).
         let profile = null;
         for (let attempt = 0; attempt < 8; attempt++) {
           await new Promise(r => setTimeout(r, 500 + attempt * 250));
@@ -73,17 +73,10 @@ export default function AuthCallback() {
           return;
         }
 
-        if (!profile) {
-          // No matching profile after retries — orphaned/wiped account.
-          await supabase.auth.signOut();
-          Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
-          navigate('/auth/student');
-          return;
-        }
-
-        if (!profile.onboarding_completed) {
-          // Standard onboarding — never auto-send to set-password here.
-          // set-password is ONLY for PASSWORD_RECOVERY / type=recovery.
+        if (!profile || !profile.onboarding_completed) {
+          // New Google/email user whose profile row doesn't exist yet (or is
+          // incomplete). Keep the session and let ProtectedRoute show onboarding,
+          // which now CREATES the profile row. Never kick the user back to login.
           navigate('/auth/student-onboarding');
           return;
         }

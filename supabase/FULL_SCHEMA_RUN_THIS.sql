@@ -526,10 +526,17 @@ create policy users_update_own_limited on users
   using  (id = auth_user_id())
   with check (id = auth_user_id());
 
+-- New-user registration: a user may INSERT their own profile row during
+-- onboarding (no trigger auto-creates it). Role locked to STUDENT default.
+create policy users_insert_own on users
+  for insert
+  with check (auth_id = auth.uid() and role = 'STUDENT');
+
 -- Revoke write access to sensitive columns from the authenticated role entirely.
 -- Only security definer triggers/functions can change these — never a direct client UPDATE.
 revoke update (karma_points, role, is_banned, is_verified) on users from authenticated;
 grant  update (full_name) on users to authenticated;
+grant  insert (auth_id, email, full_name, branch_id, semester, enrollment_id, onboarding_completed) on users to authenticated;
 
 -- ─────────────────────────────────────────
 -- 2.5.5  subjects / branches RLS policies

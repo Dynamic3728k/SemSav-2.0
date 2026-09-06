@@ -36,19 +36,37 @@ export default function Onboarding() {
     e.preventDefault();
     if (!user) return;
     if (!fullName.trim()) { toast.error('Please enter your name'); return; }
+    if (!enrollmentId.trim()) { toast.error('Please enter your Enrollment ID'); return; }
     if (!branchId) { toast.error('Please select your branch'); return; }
     setLoading(true);
 
-    const { error } = await supabase
-      .from('users')
-      .update({
-        full_name: fullName.trim(),
-        branch_id: branchId,
-        semester,
-        enrollment_id: enrollmentId || null,
-        onboarding_completed: true,
-      })
-      .eq('auth_id', user.id);
+    const fields = {
+      full_name: fullName.trim(),
+      branch_id: branchId,
+      semester,
+      enrollment_id: enrollmentId.trim(),
+      onboarding_completed: true,
+    };
+
+    // No profile row yet (brand-new Google/email user) → CREATE it.
+    // Otherwise just update the existing row.
+    let error: { message: string } | null = null;
+    if (!profile) {
+      const res = await supabase
+        .from('users')
+        .insert({
+          auth_id: user.id,
+          email: user.email ?? '',
+          ...fields,
+        });
+      error = res.error;
+    } else {
+      const res = await supabase
+        .from('users')
+        .update(fields)
+        .eq('auth_id', user.id);
+      error = res.error;
+    }
 
     setLoading(false);
     if (error) { toast.error('Failed to save profile: ' + error.message); return; }
@@ -116,16 +134,16 @@ export default function Onboarding() {
                 </div>
                 <div>
                   <label className="block text-gray-300 text-sm font-medium mb-1.5">
-                    Enrollment ID <span className="text-gray-400">(optional)</span>
+                    Enrollment ID
                   </label>
                   <input
-                    type="text" value={enrollmentId} onChange={e => setEnrollmentId(e.target.value)}
+                    type="text" required value={enrollmentId} onChange={e => setEnrollmentId(e.target.value)}
                     placeholder="e.g. 24BCSE001"
                     className="w-full bg-white/5 border border-white/15 text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-all"
                   />
                 </div>
                 <button
-                  type="button" onClick={() => { if (!fullName.trim()) { toast.error('Please enter your name'); return; } setStep(2); }}
+                  type="button" onClick={() => { if (!fullName.trim()) { toast.error('Please enter your name'); return; } if (!enrollmentId.trim()) { toast.error('Please enter your Enrollment ID'); return; } setStep(2); }}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition-all"
                 >
                   Continue →

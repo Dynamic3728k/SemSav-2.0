@@ -60,18 +60,16 @@ export function useAuth() {
   };
 
   useEffect(() => {
-    // Helper: if session exists but profile is missing (orphan/branch deleted),
-    // retry briefly for trigger race, then force local signOut per spec.
+    // Helper: if session exists but profile is missing, retry briefly to ride out
+    // any DB trigger race. If still missing it's a brand-new registration —
+    // DO NOT sign out; ProtectedRoute routes null-profile users to onboarding,
+    // which creates the profile row.
     const handleMissingProfile = async (session: Session) => {
-      // Retry for DB trigger race (new Google user) — 5 attempts with backoff
       for (let i = 0; i < 5; i++) {
         await new Promise(r => setTimeout(r, 500 + i * 300));
         const retry = await fetchProfile(session.user.id);
         if (retry) return retry;
       }
-      // Still no profile → orphaned/wiped account. Sign out locally, never render blank dashboard.
-      await supabase.auth.signOut();
-      Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
       return null;
     };
 
@@ -81,11 +79,8 @@ export function useAuth() {
         let profile = await fetchProfile(session.user.id);
         if (!profile) {
           profile = await handleMissingProfile(session);
-          if (!profile) {
-            setState({ session: null, user: null, profile: null, loading: false });
-            return;
-          }
         }
+        // Keep the session even when profile is missing so onboarding can create it.
         setState({ session, user: session.user, profile, loading: false });
       } else {
         setState({ session: null, user: null, profile: null, loading: false });
@@ -98,10 +93,6 @@ export function useAuth() {
         let profile = await fetchProfile(session.user.id);
         if (!profile) {
           profile = await handleMissingProfile(session);
-          if (!profile) {
-            setState({ session: null, user: null, profile: null, loading: false });
-            return;
-          }
         }
         setState({ session, user: session.user, profile, loading: false });
       } else {

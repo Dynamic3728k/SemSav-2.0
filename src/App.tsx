@@ -18,8 +18,14 @@ function AuthRedirectListener() {
         return;
       }
       if (event === 'SIGNED_IN') {
-        // Standard email/password or Magic Link -> home dashboard, never set-password
-        if (window.location.pathname.startsWith('/auth') && window.location.pathname !== '/auth/set-password') {
+        // Standard email/password or Magic Link -> home dashboard, never set-password.
+        // Never hijack /auth/callback — AuthCallback owns its own navigation after OAuth.
+        const { pathname } = window.location;
+        if (
+          pathname.startsWith('/auth') &&
+          pathname !== '/auth/set-password' &&
+          pathname !== '/auth/callback'
+        ) {
           navigate('/');
         }
       }
