@@ -439,18 +439,11 @@ $$;
 -- ─────────────────────────────────────────
 alter table uploads enable row level security;
 
--- Students see VERIFIED uploads in their branch+semester,
--- plus their own UNVERIFIED uploads (so they can track pending items)
-create policy uploads_select_scoped on uploads
+-- All authenticated users can read ALL uploads (community content visible across branches)
+create policy "Authenticated users can read uploads" on uploads
   for select
-  using (
-    auth_role() = 'SUPER_ADMIN'
-    or (
-      branch_id = auth_branch_id()
-      and semester = auth_semester()
-      and (status = 'VERIFIED' or user_id = auth_user_id())
-    )
-  );
+  to authenticated
+  using (true);
 
 -- Students can only insert into their own branch/semester, attributed to themselves
 create policy uploads_insert_self_scoped on uploads
@@ -475,7 +468,45 @@ create policy uploads_delete_admin_only on uploads
   using (auth_role() = 'SUPER_ADMIN');
 
 -- ─────────────────────────────────────────
--- 2.5.3  votes RLS policies
+-- 2.5.3  study_materials RLS policies
+-- ─────────────────────────────────────────
+-- Community study materials (notes & assignments) visible to ALL authenticated users
+-- regardless of branch/semester. Content moderation happens via verification queue.
+
+create table if not exists public.study_materials (
+  id            uuid primary key default uuid_generate_v4(),
+  upload_id     uuid not null references public.uploads(id) on delete cascade,
+  subject_id    uuid not null references public.subjects(id),
+  branch_id     uuid not null references public.branches(id),
+  semester      smallint not null check (semester between 1 and 12),
+  material_type text not null check (material_type in ('NOTE','ASSIGNMENT')),
+  title         text not null,
+  file_url      text not null,
+  uploader_id   uuid not null references public.users(id) on delete cascade,
+  uploader_name text,
+  created_at    timestamptz not null default now()
+);
+
+alter table public.study_materials enable row level security;
+
+-- All authenticated users can read ALL study materials (cross-branch visibility)
+create policy "Authenticated users can read study materials"
+on public.study_materials
+for select
+to authenticated
+using (true);
+
+-- Indexes for common queries
+create index if not exists idx_sm_subject_branch_sem
+  on public.study_materials (subject_id, branch_id, semester);
+create index if not exists idx_sm_upload
+  on public.study_materials (upload_id);
+
+-- Grants
+grant select on public.study_materials to authenticated;
+
+-- ─────────────────────────────────────────
+-- 2.5.4  votes RLS policies
 -- ─────────────────────────────────────────
 alter table votes enable row level security;
 
@@ -509,7 +540,7 @@ create policy votes_delete_own on votes
   using (user_id = auth_user_id());
 
 -- ─────────────────────────────────────────
--- 2.5.4  users RLS policies
+-- 2.5.5  users RLS policies
 -- ─────────────────────────────────────────
 alter table users enable row level security;
 
