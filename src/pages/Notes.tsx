@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../hooks/useAuth';
@@ -169,7 +169,10 @@ export default function Notes() {
 
     const [notesResult, assignmentsResult] = await Promise.all([notesPromise, assignmentsPromise]);
 
+    if (notesResult.error) console.error('Failed to load notes:', notesResult.error.message);
     if (!notesResult.error) setStudyMaterials((notesResult.data ?? []) as StudyMaterial[]);
+
+    if (assignmentsResult.error) console.error('Failed to load assignments:', assignmentsResult.error.message);
     if (!assignmentsResult.error) setAssignments((assignmentsResult.data ?? []) as StudyMaterial[]);
 
     setUploadsLoading(false);
@@ -179,15 +182,15 @@ export default function Notes() {
 
   // ─── Derived ───────────────────────────────────────────────────────────────
 
-  const filteredNotes = studyMaterials.filter(item => {
+  const filteredNotes = useMemo(() => studyMaterials.filter(item => {
     if (search && !item.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
-  });
+  }), [studyMaterials, search]);
 
-  const filteredAssignments = assignments.filter(item => {
+  const filteredAssignments = useMemo(() => assignments.filter(item => {
     if (search && !item.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
-  });
+  }), [assignments, search]);
 
   const filtered = tab === 'notes' ? filteredNotes : filteredAssignments;
 

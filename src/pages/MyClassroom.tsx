@@ -10,7 +10,6 @@ interface Classmate {
   avatar_url: string | null;
   karma_points: number;
   role: string;
-  auth_id: string;
 }
 
 interface BranchInfo {
@@ -34,7 +33,7 @@ export default function MyClassroom() {
 
     supabase
       .from('users')
-      .select('id, full_name, avatar_url, karma_points, role, auth_id')
+      .select('id, full_name, avatar_url, karma_points, role')
       .eq('branch_id', profile.branch_id)
       .eq('semester', profile.semester)
       .eq('is_banned', false)
@@ -165,9 +164,10 @@ export default function MyClassroom() {
         {/* Student grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(student => {
-            const isYou = student.auth_id === profile?.auth_id;
+            const isYou = student.id === profile?.id;
             const initials = student.full_name
               .split(' ')
+              .filter(Boolean)
               .map(w => w[0])
               .join('')
               .toUpperCase()

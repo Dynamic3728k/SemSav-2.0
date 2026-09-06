@@ -101,7 +101,7 @@ export default function KarmaPoll() {
       .select('id, title_syllabus, category, test_type, due_date_time, file_url, created_at, status, net_score, subjects(subject_name, subject_code), votes(vote_type, users(full_name, avatar_url))')
       .eq('user_id', profile.id)
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(500);
 
     if (!error && data) setItems((data ?? []) as Contribution[]);
     setLoading(false);

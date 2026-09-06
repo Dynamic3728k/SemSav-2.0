@@ -17,7 +17,7 @@ interface Upload {
   subjects: { subject_code: string; subject_name: string } | { subject_code: string; subject_name: string }[] | null;
 }
 
-interface User {
+interface AdminUser {
   id: string;
   full_name: string;
   email: string;
@@ -97,7 +97,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   const [uploads, setUploads] = useState<Upload[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [flaggedUsers, setFlaggedUsers] = useState<FlaggedUser[]>([]);
@@ -108,7 +108,7 @@ export default function AdminDashboard() {
   // ─── User Directory filters & detail ───────────────────────────────────
   const [userSearch, setUserSearch] = useState('');
   const [userBranchFilter, setUserBranchFilter] = useState<string>('ALL');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [selectedUserUploads, setSelectedUserUploads] = useState<UserUpload[]>([]);
   const [loadingUserUploads, setLoadingUserUploads] = useState(false);
   const [deletingUser, setDeletingUser] = useState(false);

@@ -88,7 +88,8 @@ export default function Upload() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const aiServerUrl = import.meta.env.VITE_AI_SERVER_URL || 'http://127.0.0.1:3001';
+      const aiServerUrl = import.meta.env.VITE_AI_SERVER_URL;
+      if (!aiServerUrl) throw new Error('AI server not configured. Set VITE_AI_SERVER_URL in your environment.');
       const res = await fetch(`${aiServerUrl}/api/ai-extract`, {
         method: 'POST',
         headers: {

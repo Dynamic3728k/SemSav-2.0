@@ -114,7 +114,8 @@ export async function fetchAttendanceSummary(userId: string, branchId: string, s
       }
     }
     return map;
-  } catch {
+  } catch (err) {
+    console.warn('RPC get_attendance_summary failed, falling back to client-side computation:', err);
     const logs = await fetchAttendanceLogs(userId, branchId, semester, 2000);
     const map = new Map<string, SubjectSummary>();
     for (const l of logs) {

@@ -1,79 +1,48 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { useAuth } from './hooks/useAuth';
-import { supabase } from './lib/supabaseClient';
+import { AuthProvider, useAuth } from './hooks/useAuth';
 
-function AuthRedirectListener() {
-  const navigate = useNavigate();
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, _session) => {
-      const hash = window.location.hash || '';
-      const isRecovery = hash.includes('type=recovery');
-      // Only allow set-password on explicit recovery
-      if (event === 'PASSWORD_RECOVERY' || isRecovery) {
-        if (window.location.pathname !== '/auth/set-password') {
-          navigate('/auth/set-password');
-        }
-        return;
-      }
-      if (event === 'SIGNED_IN') {
-        // Standard email/password or Magic Link -> home dashboard, never set-password.
-        // Never hijack /auth/callback — AuthCallback owns its own navigation after OAuth.
-        const { pathname } = window.location;
-        if (
-          pathname.startsWith('/auth') &&
-          pathname !== '/auth/set-password' &&
-          pathname !== '/auth/callback'
-        ) {
-          navigate('/');
-        }
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-  return null;
-}
-
-// Pages
-import LandingPage from './pages/LandingPage';
-import IntroPage from './pages/IntroPage';
-import RoleSelection from './pages/RoleSelection';
-import Login from './pages/Login';
-import SetPassword from './pages/SetPassword';
-import AdminLogin from './pages/AdminLogin';
-import Onboarding from './pages/Onboarding';
-import Dashboard from './pages/Dashboard';
-import Upload from './pages/Upload';
-import Notes from './pages/Notes';
-import Attendance from './pages/Attendance';
-import KarmaPoll from './pages/KarmaPoll';
-import MyClassroom from './pages/MyClassroom';
-import AdminDashboard from './pages/AdminDashboard';
-import AuthCallback from './pages/AuthCallback';
-import Unauthorized from './pages/Unauthorized';
-import NotFound from './pages/NotFound';
+// Pages — lazy-loaded for code splitting
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const IntroPage = lazy(() => import('./pages/IntroPage'));
+const RoleSelection = lazy(() => import('./pages/RoleSelection'));
+const Login = lazy(() => import('./pages/Login'));
+const SetPassword = lazy(() => import('./pages/SetPassword'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Upload = lazy(() => import('./pages/Upload'));
+const Notes = lazy(() => import('./pages/Notes'));
+const Attendance = lazy(() => import('./pages/Attendance'));
+const KarmaPoll = lazy(() => import('./pages/KarmaPoll'));
+const MyClassroom = lazy(() => import('./pages/MyClassroom'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AuthCallback = lazy(() => import('./pages/AuthCallback'));
+const Unauthorized = lazy(() => import('./pages/Unauthorized'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
 
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
 function LandingRoute() {
   const { session, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <LoadingFallback />;
   if (session) return <Navigate to="/dashboard" replace />;
   return <LandingPage />;
 }
 
-export default function App() {
+function InnerApp() {
   return (
-    <BrowserRouter>
-      <AuthRedirectListener />
+    <>
       {/* Aurora animated background */}
       <div className="aurora-bg" />
 
@@ -93,78 +62,63 @@ export default function App() {
         }}
       />
 
-      <Routes>
-        {/* Public routes */}
-        <Route path="/"             element={<LandingRoute />} />
-        <Route path="/intro" element={<IntroPage />} />
-        <Route path="/role" element={<RoleSelection />} />
-        <Route path="/auth/student" element={<Login />} />
-        <Route path="/admin/login"  element={<AdminLogin />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/unauthorized" element={<Unauthorized />} />
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<LandingRoute />} />
+          <Route path="/intro" element={<IntroPage />} />
+          <Route path="/role" element={<RoleSelection />} />
+          <Route path="/auth/student" element={<Login />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/login" element={<Navigate to="/auth/student" replace />} />
 
-        {/* Redirect old login to new login route just in case */}
-        <Route path="/login" element={<Navigate to="/auth/student" replace />} />
+          {/* Protected student routes */}
+          <Route path="/auth/set-password" element={
+            <ProtectedRoute><SetPassword /></ProtectedRoute>
+          } />
+          <Route path="/auth/student-onboarding" element={
+            <ProtectedRoute><Onboarding /></ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute><Dashboard /></ProtectedRoute>
+          } />
+          <Route path="/upload" element={
+            <ProtectedRoute><Upload /></ProtectedRoute>
+          } />
+          <Route path="/notes" element={
+            <ProtectedRoute><Notes /></ProtectedRoute>
+          } />
+          <Route path="/attendance" element={
+            <ProtectedRoute><Attendance /></ProtectedRoute>
+          } />
+          <Route path="/karma-poll" element={
+            <ProtectedRoute><KarmaPoll /></ProtectedRoute>
+          } />
+          <Route path="/classroom" element={
+            <ProtectedRoute><MyClassroom /></ProtectedRoute>
+          } />
 
-        {/* Protected student routes */}
-        <Route path="/auth/set-password" element={
-          <ProtectedRoute>
-            <SetPassword />
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/auth/student-onboarding" element={
-          <ProtectedRoute>
-            <Onboarding />
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/upload" element={
-          <ProtectedRoute>
-            <Upload />
-          </ProtectedRoute>
-        } />
+          {/* Protected admin routes */}
+          <Route path="/admin/dashboard" element={
+            <ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>
+          } />
 
-        <Route path="/notes" element={
-          <ProtectedRoute>
-            <Notes />
-          </ProtectedRoute>
-        } />
+          {/* 404 fallback */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+    </>
+  );
+}
 
-        <Route path="/attendance" element={
-          <ProtectedRoute>
-            <Attendance />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/karma-poll" element={
-          <ProtectedRoute>
-            <KarmaPoll />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/classroom" element={
-          <ProtectedRoute>
-            <MyClassroom />
-          </ProtectedRoute>
-        } />
-
-        {/* Protected admin routes */}
-        <Route path="/admin/dashboard" element={
-          <ProtectedRoute requireAdmin>
-            <AdminDashboard />
-          </ProtectedRoute>
-        } />
-
-        {/* 404 fallback */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <InnerApp />
+      </AuthProvider>
     </BrowserRouter>
   );
 }

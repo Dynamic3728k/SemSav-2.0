@@ -2397,7 +2397,7 @@ export default function Dashboard() {
               </svg>
               {pendingCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                  {Math.min(pendingCount, 9)}
+                  {pendingCount > 9 ? '9+' : pendingCount}
                 </span>
               )}
             </button>

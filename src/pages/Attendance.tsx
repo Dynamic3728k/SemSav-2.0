@@ -358,8 +358,7 @@ export default function Attendance() {
         {/* Missing table notice */}
         {missingTable && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
-            <span className="inline-flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 inline" /> The <code className="font-mono">attendance_logs</code> table isn&apos;t set up yet.</span>
-            Run <code className="font-mono">supabase/migrations/017_attendance.sql</code> in the Supabase SQL Editor.
+            <span className="inline-flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 inline" /> Attendance tracking is not available yet. Please contact your administrator to set it up.</span>
           </div>
         )}
 

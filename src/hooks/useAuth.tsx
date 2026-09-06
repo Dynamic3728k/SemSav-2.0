@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 
@@ -25,16 +26,23 @@ interface AuthState {
   loading: boolean;
 }
 
-export function useAuth() {
+interface AuthContextValue extends AuthState {
+  signOut: () => Promise<void>;
+  fetchProfile: (authId: string) => Promise<UserProfile | null>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     session: null,
     user: null,
     profile: null,
     loading: true,
   });
+  const mountedRef = useRef(true);
 
-  const fetchProfile = async (authId: string): Promise<UserProfile | null> => {
-    // Try with avatar_url first; fall back if column doesn't exist yet (migration pending)
+  const fetchProfile = useCallback(async (authId: string): Promise<UserProfile | null> => {
     let { data, error } = await supabase
       .from('users')
       .select('id, auth_id, enrollment_id, full_name, email, branch_id, semester, karma_points, role, is_verified, is_banned, onboarding_completed, avatar_url')
@@ -54,16 +62,15 @@ export function useAuth() {
     if (error) return null;
     if (!data) return null;
     const fresh = { ...data, avatar_url: (data as Record<string, unknown>).avatar_url ?? null } as UserProfile;
-    // Keep global state in sync so consumers re-render with fresh profile data
-    setState(prev => (prev.user ? { ...prev, profile: fresh } : prev));
+    if (mountedRef.current) {
+      setState(prev => (prev.user ? { ...prev, profile: fresh } : prev));
+    }
     return fresh;
-  };
+  }, []);
 
   useEffect(() => {
-    // Helper: if session exists but profile is missing, retry briefly to ride out
-    // any DB trigger race. If still missing it's a brand-new registration —
-    // DO NOT sign out; ProtectedRoute routes null-profile users to onboarding,
-    // which creates the profile row.
+    mountedRef.current = true;
+
     const handleMissingProfile = async (session: Session) => {
       for (let i = 0; i < 5; i++) {
         await new Promise(r => setTimeout(r, 500 + i * 300));
@@ -73,22 +80,21 @@ export function useAuth() {
       return null;
     };
 
-    // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mountedRef.current) return;
       if (session?.user) {
         let profile = await fetchProfile(session.user.id);
         if (!profile) {
           profile = await handleMissingProfile(session);
         }
-        // Keep the session even when profile is missing so onboarding can create it.
         setState({ session, user: session.user, profile, loading: false });
       } else {
         setState({ session: null, user: null, profile: null, loading: false });
       }
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mountedRef.current) return;
       if (session?.user) {
         let profile = await fetchProfile(session.user.id);
         if (!profile) {
@@ -100,12 +106,25 @@ export function useAuth() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mountedRef.current = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchProfile]);
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
   }, []);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
+  return (
+    <AuthContext.Provider value={{ ...state, signOut, fetchProfile }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
 
-  return { ...state, signOut, fetchProfile };
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 }
