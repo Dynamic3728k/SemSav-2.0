@@ -63,9 +63,9 @@ export function useAuth() {
     // Helper: if session exists but profile is missing (orphan/branch deleted),
     // retry briefly for trigger race, then force local signOut per spec.
     const handleMissingProfile = async (session: Session) => {
-      // Retry for DB trigger race (new Google user) — 3 attempts
-      for (let i = 0; i < 3; i++) {
-        await new Promise(r => setTimeout(r, 400));
+      // Retry for DB trigger race (new Google user) — 5 attempts with backoff
+      for (let i = 0; i < 5; i++) {
+        await new Promise(r => setTimeout(r, 500 + i * 300));
         const retry = await fetchProfile(session.user.id);
         if (retry) return retry;
       }

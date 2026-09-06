@@ -54,15 +54,19 @@ export default function AuthCallback() {
           return;
         }
 
-        // 3. Small delay to let DB trigger create the user row
-        await new Promise(r => setTimeout(r, 800));
-
-        // 4. Check profile and route accordingly
-        const { data: profile } = await supabase
-          .from('users')
-          .select('onboarding_completed, role')
-          .eq('auth_id', currentSession.user.id)
-          .single();
+        // 3. Wait for DB trigger to create the user row (new Google users)
+        // The Supabase trigger fires async — retry with backoff instead of a single fixed delay.
+        let profile = null;
+        for (let attempt = 0; attempt < 8; attempt++) {
+          await new Promise(r => setTimeout(r, 500 + attempt * 250));
+          const { data, error } = await supabase
+            .from('users')
+            .select('onboarding_completed, role')
+            .eq('auth_id', currentSession.user.id)
+            .maybeSingle();
+          if (data) { profile = data; break; }
+          if (error && error.code !== 'PGRST116') break;
+        }
 
         if (profile?.role === 'SUPER_ADMIN') {
           navigate('/admin/dashboard');
@@ -70,8 +74,7 @@ export default function AuthCallback() {
         }
 
         if (!profile) {
-          // No matching profile — auth was wiped (orphan/branch deleted) or stale cache.
-          // Spec: sign out locally and redirect to login/onboarding, never render blank dashboard.
+          // No matching profile after retries — orphaned/wiped account.
           await supabase.auth.signOut();
           Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
           navigate('/auth/student');
